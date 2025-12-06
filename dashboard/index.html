@@ -3,204 +3,80 @@
 
 <head>
   <meta charset="UTF-8">
-  <title>AI Trading Copilot – Dashboard</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #0b1020;
-      color: #f5f5f5;
-      margin: 0;
-      padding: 20px;
-    }
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Trading Copilot - Dashboard v1.2.4</title>
 
-    h1 {
-      margin-bottom: 0.5rem;
-    }
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-    .subtitle {
-      color: #9ca3af;
-      margin-bottom: 2rem;
-    }
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
 
-    .cards {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1rem;
-    }
-
-    .card {
-      background: #111827;
-      border-radius: 8px;
-      padding: 1rem 1.25rem;
-      min-width: 220px;
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
-    }
-
-    .card h2 {
-      font-size: 1rem;
-      margin: 0 0 0.5rem 0;
-    }
-
-    .label {
-      font-size: 0.75rem;
-      color: #9ca3af;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
-
-    .value {
-      font-size: 0.95rem;
-      margin-bottom: 0.25rem;
-    }
-
-    .badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 999px;
-      font-size: 0.7rem;
-      margin-right: 4px;
-    }
-
-    .badge-long {
-      background: #065f46;
-      color: #ecfdf5;
-    }
-
-    .badge-short {
-      background: #7f1d1d;
-      color: #fef2f2;
-    }
-
-    .badge-sideways {
-      background: #374151;
-      color: #e5e7eb;
-    }
-
-    .timestamp {
-      font-size: 0.75rem;
-      color: #6b7280;
-      margin-top: 0.25rem;
-    }
-
-    .no-signal {
-      font-size: 0.85rem;
-      color: #6b7280;
-      margin-top: 0.5rem;
-    }
-
-    .footer {
-      margin-top: 2rem;
-      font-size: 0.75rem;
-      color: #6b7280;
-    }
-  </style>
+  <!-- Styles -->
+  <link rel="stylesheet" href="css/dashboard.css">
 </head>
 
 <body>
-  <h1>AI Trading Copilot</h1>
-  <div class="subtitle">Live view of the latest signal per instrument (via /signal/latest).</div>
+  <!-- Header -->
+  <header class="header">
+    <div class="header-title">
+      <h1>AI Trading Copilot</h1>
+      <p class="subtitle">Real-time signal monitoring with news sentiment analysis</p>
+    </div>
 
-  <div id="cards" class="cards"></div>
+    <div class="header-controls">
+      <!-- Connection Status -->
+      <div class="status">
+        <div id="status-dot" class="status-dot"></div>
+        <span id="status-connection">Connecting...</span>
+      </div>
 
-  <div class="footer">
-    Backend: FastAPI • Data: CSV via DataFeed • Strategy: v1.2.1 (News Filter Enabled)
+      <!-- Signal Count -->
+      <div class="status">
+        <span id="status-text">Loading...</span>
+      </div>
+
+      <!-- Controls -->
+      <button id="refresh-btn" class="btn btn-secondary" title="Manual refresh">
+        🔄 Refresh
+      </button>
+
+      <button id="pause-btn" class="btn btn-secondary" title="Pause auto-refresh">
+        ⏸️ Pause
+      </button>
+    </div>
+  </header>
+
+  <!-- Countdown Timer -->
+  <div style="text-align: center; margin-bottom: 1.5rem;">
+    <span id="countdown" style="color: var(--text-muted); font-size: 0.875rem;">
+      Auto-refresh enabled
+    </span>
   </div>
 
+  <!-- Signals Grid -->
+  <div id="signals-grid" class="signals-grid">
+    <!-- Cards will be inserted here by JavaScript -->
+    <div class="loading">
+      <div class="spinner"></div>
+    </div>
+  </div>
 
-  <script>
-    const instruments = ["EURUSD", "GBPUSD", "XAUUSD", "NAS100", "BTCUSD"];
-    const baseUrl = window.location.origin;
+  <!-- Footer -->
+  <footer
+    style="margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--bg-tertiary); text-align: center; color: var(--text-muted); font-size: 0.875rem;">
+    <p>AI Trading Copilot v1.2.4 | Enhanced Signal Dashboard</p>
+    <p style="margin-top: 0.5rem; font-size: 0.75rem;">
+      Auto-refresh: 10s | News Filter: Enabled | Performance Optimized
+    </p>
+  </footer>
 
-    function badgeForDirection(direction) {
-      if (direction === "long") {
-        return '<span class="badge badge-long">LONG</span>';
-      }
-      if (direction === "short") {
-        return '<span class="badge badge-short">SHORT</span>';
-      }
-      return "";
-    }
-
-    function badgeForTrend(trend) {
-      if (!trend) return "";
-      let cls = "badge-sideways";
-      if (trend === "uptrend") cls = "badge-long";
-      if (trend === "downtrend") cls = "badge-short";
-      return '<span class="badge ' + cls + '">' + trend.toUpperCase() + '</span>';
-    }
-
-    async function fetchSignal(symbol) {
-      const url = baseUrl + "/signal/latest?instrument=" + encodeURIComponent(symbol);
-      try {
-        const res = await fetch(url);
-        if (!res.ok) {
-          return { instrument: symbol, error: "HTTP " + res.status };
-        }
-        const data = await res.json();
-        return data || { instrument: symbol, signal: null };
-      } catch (err) {
-        return { instrument: symbol, error: String(err) };
-      }
-    }
-
-    async function refreshSignals() {
-      const container = document.getElementById("cards");
-      container.innerHTML = "";
-      const results = await Promise.all(instruments.map(fetchSignal));
-
-      results.forEach((data, idx) => {
-        const symbol = instruments[idx];
-        const card = document.createElement("div");
-        card.className = "card";
-
-        let inner = "<h2>" + symbol + "</h2>";
-
-        if (!data || data.error) {
-          inner += '<div class="no-signal">Error: ' + (data && data.error ? data.error : "No data") + "</div>";
-        } else if (!data.instrument) {
-          inner += '<div class="no-signal">No signal yet</div>';
-        } else {
-          inner += '<div class="value">' +
-            badgeForDirection(data.direction) +
-            badgeForTrend(data.trend_regime) +
-            "</div>";
-          inner += '<div class="value"><span class="label">Entry</span> ' + data.entry + "</div>";
-          inner += '<div class="value"><span class="label">Stop</span> ' + data.stop + "</div>";
-          inner += '<div class="value"><span class="label">TP1</span> ' + data.tp1 + "</div>";
-          if (data.tp2) {
-            inner += '<div class="value"><span class="label">TP2</span> ' + data.tp2 + "</div>";
-          }
-
-          // News filter fields (v1.2.1)
-          if (typeof data.news_blocked !== 'undefined') {
-            const newsIcon = data.news_blocked ? '🔴' : '🟢';
-            const newsText = data.news_blocked ? 'Blocked' : 'Clear';
-            inner += '<div class="value"><span class="label">News</span> ' + newsIcon + ' ' + newsText + '</div>';
-          }
-
-          if (typeof data.sentiment_score !== 'undefined' && data.sentiment_score !== 0) {
-            const sentIcon = data.sentiment_score > 0 ? '📈' : '📉';
-            inner += '<div class="value"><span class="label">Sentiment</span> ' + sentIcon + ' ' + data.sentiment_score.toFixed(2) + '</div>';
-          }
-
-          if (data.timestamp) {
-            inner += '<div class="timestamp">Signal time: ' + data.timestamp + "</div>";
-          }
-        }
-
-        card.innerHTML = inner;
-        container.appendChild(card);
-      });
-    }
-
-    function bootstrap() {
-      refreshSignals();
-      setInterval(refreshSignals, 30000);
-    }
-
-    bootstrap();
-  </script>
-
+  <!-- Scripts -->
+  <script src="js/api.js"></script>
+  <script src="js/components.js"></script>
+  <script src="js/dashboard.js"></script>
 </body>
 
 </html>
