@@ -1,9 +1,10 @@
-"""FastAPI server for AI Trading Copilot v1.0.
+"""FastAPI server for AI Trading Copilot v1.2.5.
 
-This service exposes HTTP endpoints that allow clients to:
+This service exposes HTTP endpoints and WebSocket that allow clients to:
 
 - Request the latest trading signal for a given instrument.
 - Request signals for all instruments at once (v1.2.4)
+- Subscribe to real-time signal updates via WebSocket (v1.2.5)
 - View a simple HTML dashboard.
 - Inspect the active configuration.
 - Retrieve a simulated portfolio equity curve from the backtester.
@@ -12,10 +13,12 @@ This service exposes HTTP endpoints that allow clients to:
 from __future__ import annotations
 
 import os
+import asyncio
+import json
 from dataclasses import asdict
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Set
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 
 from ..core.data_feed import DataFeed, DataFeedConfig
@@ -26,7 +29,41 @@ from ..core.news import NewsEngine
 from .schemas import SignalResponse
 
 
-app = FastAPI(title="AI Trading Copilot v1.2.4")
+app = FastAPI(title="AI Trading Copilot v1.2.5")
+
+# WebSocket connection manager (v1.2.5)
+class ConnectionManager:
+    """Manages WebSocket connections for real-time signal broadcasting."""
+    
+    def __init__(self):
+        self.active_connections: Set[WebSocket] = set()
+    
+    async def connect(self, websocket: WebSocket):
+        """Accept and register a new WebSocket connection."""
+        await websocket.accept()
+        self.active_connections.add(websocket)
+        print(f"WebSocket connected. Total connections: {len(self.active_connections)}")
+    
+    def disconnect(self, websocket: WebSocket):
+        """Remove a WebSocket connection."""
+        self.active_connections.discard(websocket)
+        print(f"WebSocket disconnected. Total connections: {len(self.active_connections)}")
+    
+    async def broadcast(self, message: dict):
+        """Broadcast message to all connected clients."""
+        disconnected = set()
+        for connection in self.active_connections:
+            try:
+                await connection.send_json(message)
+            except Exception as e:
+                print(f"Error sending to client: {e}")
+                disconnected.add(connection)
+        
+        # Remove failed connections
+        for connection in disconnected:
+            self.disconnect(connection)
+
+manager = ConnectionManager()
 
 # Load application config once on startup
 APP_CONFIG = load_config()
@@ -164,6 +201,47 @@ def get_portfolio_equity_curve() -> List[Dict[str, Any]]:
     except FileNotFoundError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     return points
+
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    """WebSocket endpoint for real-time signal updates (v1.2.5).
+    
+    Clients connect to this endpoint to receive automatic signal updates
+    every 5 seconds without polling. Provides lower latency than HTTP.
+    
+    Example client usage:
+        const ws = new WebSocket('ws://127.0.0.1:8000/ws');
+        ws.onmessage = (event) => {
+            const signals = JSON.parse(event.data);
+            updateUI(signals);
+        };
+    """
+    await manager.connect(websocket)
+    
+    try:
+        # Keep connection alive and send periodic signals
+        while True:
+            try:
+                # Fetch latest signals
+                signals_dict = get_all_signals()
+                
+                # Send to this client
+                await websocket.send_json(signals_dict)
+                
+                # Wait 5 seconds before next update
+                await asyncio.sleep(5)
+                
+            except Exception as e:
+                print(f"Error in WebSocket loop: {e}")
+                break
+                
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+        print("Client disconnected normally")
+    except Exception as e:
+        print(f"WebSocket error: {e}")
+        manager.disconnect(websocket)
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
