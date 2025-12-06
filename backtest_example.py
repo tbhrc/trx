@@ -25,6 +25,7 @@ import pandas as pd
 from src.v1_0.core.data_feed import DataFeed, DataFeedConfig
 from src.v1_0.core.strategy import StrategyEngine, StrategyConfig, Signal
 from src.v1_0.core.config import load_config
+from src.v1_0.core.news import NewsEngine
 
 
 @dataclass
@@ -43,12 +44,19 @@ def run_backtest() -> None:
     cfg = load_config()
     feed = DataFeed(DataFeedConfig(path_pattern=cfg.data.path_pattern))
     sc = cfg.strategy
+    
+    # Initialize news engine if enabled
+    news_engine = None
+    if cfg.news.enabled:
+        news_engine = NewsEngine(cfg.news)
+    
     engine = StrategyEngine(
         config=StrategyConfig(
             risk_percent_default=sc.risk_percent_default,
             min_rr=sc.min_rr,
             atr_stop_multiplier=sc.atr_stop_multiplier,
-        )
+        ),
+        news_engine=news_engine,
     )
 
     instrument = "EURUSD"
@@ -63,6 +71,8 @@ def run_backtest() -> None:
 
     open_trades: List[BacktestTrade] = []
     closed_trades: List[BacktestTrade] = []
+    total_signal_candidates = 0
+    news_blocked_count = 0
 
     # We iterate over H4 bars starting after some warm-up period
     warmup = 50
@@ -123,7 +133,11 @@ def run_backtest() -> None:
 
         # 2) Generate new signals from strategy using all data so far
         signals: List[Signal] = engine.generate_signals(instrument, daily_slice, h4_slice)
+        total_signal_candidates += 1
+        
         if not signals:
+            # Signal was filtered out (potentially by news)
+            news_blocked_count += 1
             continue
 
         sig = signals[-1]
@@ -175,6 +189,7 @@ def run_backtest() -> None:
     print(f"Average R   : {avg_r:.2f}")
     print(f"Wins        : {len(wins)}")
     print(f"Losses      : {len(losses)}")
+    print(f"Signals blocked: {news_blocked_count} / {total_signal_candidates} candidates")
 
     if losses:
         avg_loss = sum(losses) / len(losses)

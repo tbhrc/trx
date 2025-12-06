@@ -17,3 +17,13 @@ strategy:
   risk_percent_default: 0.75
   min_rr: 2.0
   atr_stop_multiplier: 1.25
+
+# News filter configuration
+news:
+  enabled: true
+  calendar_path: "data/economic_calendar.csv"
+  headlines_path: "data/news_headlines.csv"
+  block_before_minutes: 45
+  block_after_minutes: 30
+  high_impact_only: true
+  sentiment_threshold: -0.5

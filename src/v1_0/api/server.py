@@ -21,6 +21,7 @@ from ..core.data_feed import DataFeed, DataFeedConfig
 from ..core.strategy import StrategyEngine, StrategyConfig
 from ..core.config import load_config
 from ..core.equity import compute_portfolio_equity_curve
+from ..core.news import NewsEngine
 from .schemas import SignalResponse
 
 
@@ -52,7 +53,13 @@ def _build_strategy_engine() -> StrategyEngine:
         min_rr=sc.min_rr,
         atr_stop_multiplier=sc.atr_stop_multiplier,
     )
-    return StrategyEngine(config=cfg)
+    
+    # Add news engine if enabled
+    news_engine = None
+    if APP_CONFIG.news.enabled:
+        news_engine = NewsEngine(APP_CONFIG.news)
+    
+    return StrategyEngine(config=cfg, news_engine=news_engine)
 
 
 # Global singletons for simplicity in v1.0

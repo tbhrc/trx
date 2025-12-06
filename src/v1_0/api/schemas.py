@@ -23,6 +23,8 @@ class SignalResponse(BaseModel):
     risk_percent: float
     trend_regime: str
     timestamp: datetime
+    news_blocked: bool = False
+    sentiment_score: float = 0.0
 
     @classmethod
     def from_domain(cls, signal) -> "SignalResponse":
@@ -37,4 +39,6 @@ class SignalResponse(BaseModel):
             risk_percent=signal.risk_percent,
             trend_regime=signal.trend_regime,
             timestamp=signal.timestamp.to_pydatetime() if hasattr(signal.timestamp, "to_pydatetime") else signal.timestamp,
+            news_blocked=getattr(signal, "news_blocked", False),
+            sentiment_score=getattr(signal, "sentiment_score", 0.0),
         )

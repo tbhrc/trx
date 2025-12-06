@@ -15,6 +15,7 @@ from typing import List, Optional
 import pandas as pd
 
 from .indicators import IndicatorEngine, IndicatorConfig
+from .news import NewsEngine
 
 
 @dataclass
@@ -28,6 +29,8 @@ class Signal:
     risk_percent: float
     trend_regime: str
     timestamp: pd.Timestamp
+    news_blocked: bool = False
+    sentiment_score: float = 0.0
 
 
 @dataclass
@@ -50,9 +53,11 @@ class StrategyEngine:
     """
 
     def __init__(self, indicator_engine: Optional[IndicatorEngine] = None,
-                 config: Optional[StrategyConfig] = None) -> None:
+                 config: Optional[StrategyConfig] = None,
+                 news_engine: Optional[NewsEngine] = None) -> None:
         self.indicators = indicator_engine or IndicatorEngine(IndicatorConfig())
         self.config = config or StrategyConfig()
+        self.news_engine = news_engine
 
     def _trend_regime_daily(self, df_daily: pd.DataFrame) -> str:
         df = self.indicators.add_core_indicators(df_daily)
@@ -116,6 +121,23 @@ class StrategyEngine:
         # v1.0: TP2 is optional; can be extended later
         tp2 = None
 
+        # Check news filter before creating signal
+        timestamp = row["timestamp"]
+        news_blocked = False
+        sentiment_score = 0.0
+        
+        if self.news_engine:
+            news_blocked = self.news_engine.is_blocked(instrument, timestamp)
+            sentiment_score = self.news_engine.get_sentiment_score(instrument, timestamp)
+            
+            # Skip signal if blocked by news
+            if news_blocked:
+                return signals
+            
+            # Skip signal if sentiment opposes direction
+            if self.news_engine.should_reduce_risk(instrument, direction, timestamp):
+                return signals
+        
         signal = Signal(
             instrument=instrument,
             direction=direction,
@@ -125,7 +147,9 @@ class StrategyEngine:
             tp2=tp2,
             risk_percent=self.config.risk_percent_default,
             trend_regime=regime,
-            timestamp=row["timestamp"],
+            timestamp=timestamp,
+            news_blocked=news_blocked,
+            sentiment_score=sentiment_score,
         )
         signals.append(signal)
         return signals

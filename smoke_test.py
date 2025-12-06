@@ -19,6 +19,7 @@ import os
 from src.v1_0.core.data_feed import DataFeed, DataFeedConfig
 from src.v1_0.core.strategy import StrategyEngine, StrategyConfig
 from src.v1_0.core.config import load_config
+from src.v1_0.core.news import NewsEngine
 
 
 def main() -> None:
@@ -27,12 +28,22 @@ def main() -> None:
     pattern = os.getenv("DATA_PATH_PATTERN", cfg.data.path_pattern)
     feed = DataFeed(DataFeedConfig(path_pattern=pattern))
     sc = cfg.strategy
+    
+    # Initialize news engine if enabled
+    news_engine = None
+    if cfg.news.enabled:
+        news_engine = NewsEngine(cfg.news)
+        print(f"News filter: ENABLED (calendar: {cfg.news.calendar_path})")
+    else:
+        print("News filter: DISABLED")
+    
     engine = StrategyEngine(
         config=StrategyConfig(
             risk_percent_default=sc.risk_percent_default,
             min_rr=sc.min_rr,
             atr_stop_multiplier=sc.atr_stop_multiplier,
-        )
+        ),
+        news_engine=news_engine,
     )
 
     instrument = "EURUSD"
@@ -57,6 +68,8 @@ def main() -> None:
     print(f"TP1        : {sig.tp1}")
     print(f"TP2        : {sig.tp2}")
     print(f"Risk %     : {sig.risk_percent}")
+    print(f"News Blocked: {sig.news_blocked}")
+    print(f"Sentiment  : {sig.sentiment_score:.2f}")
 
 
 if __name__ == "__main__":

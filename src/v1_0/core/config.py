@@ -30,10 +30,23 @@ class StrategyConfigValues:
 
 
 @dataclass
+class NewsConfig:
+    """Configuration for news filtering."""
+    enabled: bool = True
+    calendar_path: str = "data/economic_calendar.csv"
+    headlines_path: str = "data/news_headlines.csv"
+    block_before_minutes: int = 45
+    block_after_minutes: int = 30
+    high_impact_only: bool = True
+    sentiment_threshold: float = -0.5
+
+
+@dataclass
 class AppConfig:
     instruments: List[str]
     data: DataConfig
     strategy: StrategyConfigValues
+    news: NewsConfig
 
 
 def load_config(path: str | None = None) -> AppConfig:
@@ -52,6 +65,7 @@ def load_config(path: str | None = None) -> AppConfig:
 
     data_cfg = raw.get("data") or {}
     strategy_cfg = raw.get("strategy") or {}
+    news_cfg = raw.get("news") or {}
 
     data = DataConfig(
         path_pattern=data_cfg.get("path_pattern", "data/{symbol}_{timeframe}.csv"),
@@ -62,9 +76,20 @@ def load_config(path: str | None = None) -> AppConfig:
         min_rr=float(strategy_cfg.get("min_rr", 2.0)),
         atr_stop_multiplier=float(strategy_cfg.get("atr_stop_multiplier", 1.25)),
     )
+    
+    news = NewsConfig(
+        enabled=bool(news_cfg.get("enabled", True)),
+        calendar_path=str(news_cfg.get("calendar_path", "data/economic_calendar.csv")),
+        headlines_path=str(news_cfg.get("headlines_path", "data/news_headlines.csv")),
+        block_before_minutes=int(news_cfg.get("block_before_minutes", 45)),
+        block_after_minutes=int(news_cfg.get("block_after_minutes", 30)),
+        high_impact_only=bool(news_cfg.get("high_impact_only", True)),
+        sentiment_threshold=float(news_cfg.get("sentiment_threshold", -0.5)),
+    )
 
     return AppConfig(
         instruments=instruments,
         data=data,
         strategy=strategy,
+        news=news,
     )
