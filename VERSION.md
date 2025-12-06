@@ -1,9 +1,38 @@
-v1.2.1
-Date: 2025-12-06 14:10 (UAE)
+v1.2.3
+Date: 2025-12-06 14:32 (UAE)
 
-## Features Added
+## Features Planned
 
-### News & Economic Calendar Filter (Core Implementation)
+This version will include:
+- Phase 5: Performance Optimization (sentiment analysis caching, vectorization)
+- Phase 6: Advanced Sentiment Features (NLP-based analysis)
+- Additional enhancements TBD
+
+## Previous Versions
+
+### v1.2.2 (2025-12-06) - Dashboard Integration & Data Sources Research
+- **Dashboard Integration**:
+  - Updated dashboard to display `news_blocked` and `sentiment_score` fields
+  - Added visual indicators (🟢/🔴 for news status, 📈/📉 for sentiment)
+  - Footer updated to v1.2.1
+  
+- **Production Data Sources Research**:
+  - Created comprehensive data sources guide (`docs/v1.2.2/data_sources_guide.md`)
+  - Researched 6 production data sources (3 calendar, 3 headlines)
+  - Documented pricing tiers: $0 (free), $50-100, $200-500, $1000+
+  - Recommendations: ForexFactory + Alpha Vantage for free tier
+  - Full implementation roadmap (MVP → Production → Enterprise)
+
+**Files Modified**:
+- `dashboard/index.html` - Added news filter field display
+
+**Files Created**:
+- `docs/v1.2.2/` - v1.2.2 documentation folder
+- `docs/v1.2.2/data_sources_guide.md` - Comprehensive data sources research
+
+---
+
+### v1.2.1 (2025-12-06) - News & Economic Calendar Filter (Core Implementation)
 - **NewsEngine**: Complete implementation with CSV-based calendar and headline loading
   - Event blocking logic (45 min before, 30 min after high-impact events)
   - Keyword-based sentiment analysis (-1.0 to +1.0 scoring)
@@ -36,14 +65,7 @@ Date: 2025-12-06 14:10 (UAE)
   - Smoke test and backtest verified with news filter enabled
   - API endpoints tested and functional
 
-### Documentation
-- Added developer framework docs (`MASTER_PROMPT_AI_DEV`, `DEVELOPER_CONTRACT`, `dev_contract`)
-- Added `docs/rfcs/` folder for future design notes
-- Created `docs/v1.2.1/` with implementation plan and walkthrough
-
-## Files Modified/Created
-
-**Core Implementation** (8 files):
+**Files Modified/Created** (Core Implementation):
 - `src/v1_0/core/news.py` (new, 184 lines)
 - `src/v1_0/core/config.py` (+20 lines)
 - `src/v1_0/core/strategy.py` (+27 lines)
@@ -52,45 +74,26 @@ Date: 2025-12-06 14:10 (UAE)
 - `src/v1_0/api/schemas.py` (+4 lines)
 - `smoke_test.py` (+12 lines)
 - `backtest_example.py` (+14 lines)
+- `src/__init__.py` (new)
+- `src/v1_0/__init__.py` (new)
 
-**Data Files** (2 new):
-- `data/economic_calendar.csv`
-- `data/news_headlines.csv`
+**Data Files**:
+- `data/economic_calendar.csv` (new)
+- `data/news_headlines.csv` (new)
 
-**Testing** (1 new):
-- `src/v1_0/tests/test_news.py` (21 test cases, 320 lines)
+**Testing**:
+- `src/v1_0/tests/test_news.py` (new, 21 test cases, 320 lines)
 
-**Package Structure** (2 new):
-- `src/__init__.py`
-- `src/v1_0/__init__.py`
+---
 
-## Roadmap - Future Enhancements (v1.2.2+)
+### v1.2.0 (2025-12-06) - Developer Framework Documentation
+- Added developer framework docs (`MASTER_PROMPT_AI_DEV`, `DEVELOPER_CONTRACT`, `dev_contract`)
+- Added `docs/rfcs/` folder for future design notes
 
-### Phase 3: Dashboard Integration
-- Verify news filter fields display in HTML dashboard
-- Add visual indicators for news-blocked signals
-- Browser console error validation
+---
 
-### Phase 4: Production Data Sources
-- Integrate real-time economic calendar APIs (ForexFactory, Investing.com, Trading Economics)
-- Connect to news headline APIs (NewsAPI, Alpha Vantage, Finnhub)
-- Automated data ingestion scripts
-- API rate limit management
-
-### Phase 5: Performance Optimization
-- Implement sentiment score caching for repeat queries
-- Vectorize keyword matching using numpy for large datasets (1000+ headlines)
-- Add headline expiration and automatic cleanup (remove >7 days old)
-- Pre-index headlines by instrument for O(1) lookup
-
-### Phase 6: Advanced Features
-- NLP-based sentiment analysis (replace keyword matching)
-- Multi-source sentiment aggregation
-- Event impact prediction modeling
-- Custom event definitions and blocking windows
-- Real-time WebSocket updates for news events
-
-## Version History
-- v1.2.1 (2025-12-06): News & Economic Calendar Filter with comprehensive testing
-- v1.2.0 (2025-12-06): Developer framework documentation
-- v1.0.0: Initial release with core strategy engine
+### v1.0.0 - Initial Release
+- Core strategy engine with rule-based trading logic
+- Risk management and money management
+- FastAPI server with signal endpoints
+- MT4/MT5 integration architecture
