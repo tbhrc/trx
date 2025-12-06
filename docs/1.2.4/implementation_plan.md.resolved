@@ -1,0 +1,335 @@
+# Trading Dashboard Frontend - Implementation Plan
+
+## Overview
+
+Design and build a comprehensive, professional trading dashboard that integrates all AI Trading Copilot features into a single interface for traders.
+
+---
+
+## Current State Analysis
+
+### Existing Components
+
+**Backend (FastAPI)**:
+- `/signal/latest` - Get latest signal for instrument
+- `/config` - Get system configuration
+- StrategyEngine, NewsEngine, RiskEngine integrated
+
+**Frontend (Basic)**:
+- `dashboard/index.html` - Minimal signal display
+- Shows signal cards (entry, stop, TP1, TP2)
+- Displays news_blocked and sentiment_score
+
+**Gaps**:
+- No real-time updates
+- No news sentiment visualization
+- No risk management controls
+- No performance tracking
+- No multi-timeframe analysis
+- No signal history
+- Limited interactivity
+
+---
+
+## Proposed Dashboard Design
+
+### Page Structure
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Header: AI Trading Copilot | Status Indicator         │
+├─────────────────────────────────────────────────────────┤
+│  Nav: Signals | News | Risk | Performance | Settings   │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  Main Content Area (Tab-based)                         │
+│                                                         │
+│  [Current view based on selected tab]                  │
+│                                                         │
+├─────────────────────────────────────────────────────────┤
+│  Footer: System Status | Last Update | Version         │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Tab 1: Live Signals Dashboard
+
+**Layout**:
+- **Top Row**: Market overview cards (5 instruments)
+- **Middle Row**: Active signal details + chart preview
+- **Bottom Row**: Signal queue + recent trades
+
+**Features**:
+- Real-time signal updates (auto-refresh every 10s)
+- Signal strength indicator (0-100%)
+- News filter status (🟢 Clear / 🔴 Blocked)
+- Sentiment score visualization (gauge chart)
+- Trade actions: Copy to MT4/MT5, Send alert
+- Signal history timeline
+
+### Tab 2: News & Sentiment Hub
+
+**Layout**:
+- **Left Panel**: Economic calendar (upcoming events)
+- **Center Panel**: News headlines feed
+- **Right Panel**: Sentiment analysis dashboard
+
+**Features**:
+- **Economic Calendar**:
+  - High-impact events highlighted
+  - Blocking windows visualized
+  - Countdown timers
+  - Currency filter
+
+- **News Headlines**:
+  - Live feed (if integrated)
+  - Sentiment tags (📈 Bullish / 📉 Bearish)
+  - Source attribution
+  - Filter by instrument
+
+- **Sentiment Dashboard**:
+  - 24-hour sentiment trend charts
+  - Sentiment heatmap (all instruments)
+  - Sentiment strength gauge
+  - Historical correlation
+
+### Tab 3: Risk Management Console
+
+**Layout**:
+- **Top**: Portfolio risk overview
+- **Middle**: Position sizing calculator
+- **Bottom**: Risk limit controls
+
+**Features**:
+- Current exposure by instrument
+- Risk per trade calculator
+- Max drawdown monitor
+- Position size recommendations
+- Risk alerts and warnings
+- Correlation matrix
+
+### Tab 4: Performance Analytics
+
+**Layout**:
+- **Top**: Performance metrics cards
+- **Middle**: Equity curve chart
+- **Bottom**: Trade log table
+
+**Features**:
+- **Metrics**:
+  - Win rate, Profit factor
+  - Avg win/loss, Sharpe ratio
+  - Max DD, Recovery factor
+
+- **Equity Curve**:
+  - Cumulative P&L
+  - Drawdown overlay
+  - Benchmark comparison
+
+- **Trade Log**:
+  - All signals with outcomes
+  - Filter/sort capabilities
+  - Export to CSV
+
+### Tab 5: System Settings
+
+**Layout**:
+- Configuration editor
+- Engine status indicators
+- System logs viewer
+
+**Features**:
+- Enable/disable news filter
+- Adjust risk parameters
+- API key management
+- Data refresh controls
+- Export/import config
+
+---
+
+## Technical Stack
+
+### Frontend
+- **HTML5** + **CSS3** (Vanilla, no framework bloat)
+- **JavaScript ES6+** (modular architecture)
+- **Chart.js** - Charts and visualizations
+- **Fetch API** - Backend communication
+- **WebSocket** (future) - Real-time updates
+
+### Styling
+- **Dark theme** - Professional trading aesthetic
+- **Responsive design** - Works on tablets/desktops
+- **CSS Grid** + **Flexbox** - Modern layouts
+- **Animations** - Smooth transitions
+
+### Architecture
+```
+dashboard/
+├── index.html          # Main dashboard
+├── css/
+│   ├── variables.css   # Design tokens
+│   ├── layout.css      # Grid/flex layouts
+│   ├── components.css  # Reusable components
+│   └── pages.css       # Page-specific styles
+├── js/
+│   ├── main.js         # App initialization
+│   ├── api.js          # Backend API client
+│   ├── components/     # UI components
+│   │   ├── SignalCard.js
+│   │   ├── NewsCard.js
+│   │   ├── Chart.js
+│   │   └── ...
+│   ├── pages/          # Page controllers
+│   │   ├── SignalsPage.js
+│   │   ├── NewsPage.js
+│   │   └── ...
+│   └── utils/          # Helpers
+│       ├── formatters.js
+│       └── validators.js
+└── assets/
+    └── icons/          # SVG icons
+```
+
+---
+
+## Implementation Phases
+
+### Phase 1: Enhanced Signal Dashboard (Priority 1)
+- Redesign signal cards with modern UI
+- Add auto-refresh (10s interval)
+- Implement sentiment visualizations
+- Add signal strength indicators
+- Create responsive grid layout
+
+**Estimated**: 4-6 hours
+
+### Phase 2: News & Sentiment Hub (Priority 2)
+- Economic calendar widget
+- News headlines feed
+- Sentiment trend charts (Chart.js)
+- 24-hour sentiment heatmap
+- Instrument filtering
+
+**Estimated**: 6-8 hours
+
+### Phase 3: Risk Management Console (Priority 3)
+- Position sizing calculator
+- Risk exposure charts
+- Alert system for risk limits
+- Correlation matrix visualization
+
+**Estimated**: 4-6 hours
+
+### Phase 4: Performance Analytics (Priority 4)
+- Performance metrics display
+- Equity curve chart
+- Trade log table with export
+- Statistics dashboard
+
+**Estimated**: 5-7 hours
+
+### Phase 5: Settings & Polish (Priority 5)
+- Settings page
+- System status indicators
+- Loading states and error handling
+- Responsive breakpoints
+- Cross-browser testing
+
+**Estimated**: 3-4 hours
+
+**Total Estimated Time**: 22-31 hours
+
+---
+
+## API Requirements
+
+### Existing Endpoints ✅
+- `GET /signal/latest?instrument={symbol}` - Works
+- `GET /config` - Works
+
+### New Endpoints Needed
+- `GET /signals/history?instrument={symbol}&limit={n}` - Signal history
+- `GET /news/calendar?days={n}` - Economic calendar events
+- `GET /news/headlines?instrument={symbol}&hours={n}` - Headlines
+- `GET /news/sentiment/trend?instrument={symbol}&hours={n}` - Sentiment time series
+- `GET /performance/metrics` - Performance statistics
+- `GET /performance/equity` - Equity curve data
+- `POST /config/update` - Update configuration
+- `GET /system/status` - System health check
+
+**Action Required**: Create these endpoints in `server.py`
+
+---
+
+## Design System
+
+### Color Palette (Dark Mode)
+```css
+--bg-primary: #0b1020;      /* Main background */
+--bg-secondary: #111827;    /* Cards/panels */
+--bg-tertiary: #1f2937;     /* Hover states */
+
+--text-primary: #f5f5f5;    /* Main text */
+--text-secondary: #9ca3af;  /* Secondary text */
+--text-muted: #6b7280;      /* Muted text */
+
+--accent-long: #10b981;     /* Long/buy */
+--accent-short: #ef4444;    /* Short/sell */
+--accent-neutral: #3b82f6;  /* Neutral/info */
+--accent-warning: #f59e0b;  /* Warnings */
+```
+
+### Typography
+```css
+--font-family: 'Inter', -apple-system, sans-serif;
+--font-size-xs: 0.75rem;
+--font-size-sm: 0.875rem;
+--font-size-base: 1rem;
+--font-size-lg: 1.125rem;
+--font-size-xl: 1.25rem;
+--font-size-2xl: 1.5rem;
+```
+
+### Components
+- **Cards**: Elevated panels with shadow
+- **Buttons**: Primary, secondary, danger variants
+- **Badges**: Status indicators (success, warning, error)
+- **Charts**: Consistent color scheme
+- **Tables**: Striped rows, sortable headers
+- **Modals**: For detailed views
+
+---
+
+## MVP Scope (Recommended Start)
+
+**Focus**: Phase 1 + Phase 2 (Signals + News)
+
+**Deliverables**:
+1. Professional signal dashboard
+2. News sentiment visualization
+3. Economic calendar integration
+4. Auto-refresh functionality
+5. Responsive design
+
+**Why**: Covers 80% of trader needs, validates design, sets foundation
+
+---
+
+## Success Criteria
+
+1. **Usability**: Trader can view all critical info at-a-glance
+2. **Performance**: Page loads <2s, updates <500ms
+3. **Reliability**: Handles API errors gracefully
+4. **Aesthetics**: Professional, modern, clean design
+5. **Functionality**: All engines integrated and visible
+
+---
+
+## Next Steps
+
+1. **Approve plan** and scope
+2. **Create backend endpoints** (if needed)
+3. **Build Phase 1** (Signal Dashboard)
+4. **Iterate based on feedback**
+5. **Expand to Phase 2-5** progressively
+
+**Recommended**: Start with Phase 1 MVP, validate with user, then expand.

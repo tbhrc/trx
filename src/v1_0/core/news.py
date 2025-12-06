@@ -237,7 +237,7 @@ class NewsEngine:
         timestamps = pd.date_range(
             end=timestamp,
             periods=hours_back,
-            freq='H'
+            freq='h'  # lowercase 'h' for hourly
         )
         
         # Calculate sentiment for each hour

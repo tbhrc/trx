@@ -3,6 +3,7 @@
 This service exposes HTTP endpoints that allow clients to:
 
 - Request the latest trading signal for a given instrument.
+- Request signals for all instruments at once (v1.2.4)
 - View a simple HTML dashboard.
 - Inspect the active configuration.
 - Retrieve a simulated portfolio equity curve from the backtester.
@@ -25,7 +26,7 @@ from ..core.news import NewsEngine
 from .schemas import SignalResponse
 
 
-app = FastAPI(title="AI Trading Copilot v1.0")
+app = FastAPI(title="AI Trading Copilot v1.2.4")
 
 # Load application config once on startup
 APP_CONFIG = load_config()
@@ -98,6 +99,51 @@ def get_latest_signal(
 
     sig = signals[-1]
     return SignalResponse.from_domain(sig)
+
+
+@app.get("/signals/all")
+def get_all_signals() -> Dict[str, Optional[SignalResponse]]:
+    """Return latest signals for all configured instruments (v1.2.4).
+    
+    This endpoint fetches signals for all instruments defined in config.yaml
+    in a single API call, reducing overhead for dashboard multi-instrument view.
+    
+    Returns:
+        Dictionary mapping instrument symbols to their latest signals.
+        Value is null if no signal exists for that instrument.
+    
+    Example response:
+        {
+            "EURUSD": {"direction": "long", "entry": 1.0850, ...},
+            "GBPUSD": {"direction": "short", "entry": 1.2650, ...},
+            "XAUUSD": null,
+            ...
+        }
+    """
+    results = {}
+    
+    for instrument in APP_CONFIG.instruments:
+        try:
+            df_daily = DATA_FEED.get_candles(instrument, "D")
+            df_h4 = DATA_FEED.get_candles(instrument, "H4")
+            
+            if df_daily.empty or df_h4.empty:
+                results[instrument] = None
+                continue
+                
+            signals = STRATEGY_ENGINE.generate_signals(instrument, df_daily, df_h4)
+            
+            if signals:
+                results[instrument] = SignalResponse.from_domain(signals[-1])
+            else:
+                results[instrument] = None
+                
+        except Exception as e:
+            # Log error but continue processing other instruments
+            print(f"Error fetching signal for {instrument}: {e}")
+            results[instrument] = None
+    
+    return results
 
 
 @app.get("/config")
