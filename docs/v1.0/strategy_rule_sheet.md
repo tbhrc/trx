@@ -1,5 +1,5 @@
 # AI Trading Copilot – Strategy Rule Sheet (v1.0)
-Version: 1.0  
+Version: 1.0  "FROZEN"
 Date: 06 December 2025 (GST)
 
 # SECTION A — INSTRUMENT SCOPE

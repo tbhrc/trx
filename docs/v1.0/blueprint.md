@@ -1,4 +1,4 @@
-# AI Trading Copilot – Blueprint Document
+# AI Trading Copilot – Blueprint Document "FROZEN"
 Version: 1.0  
 Date: 06 December 2025 (GST)
 

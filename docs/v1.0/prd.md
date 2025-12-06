@@ -1,5 +1,5 @@
 # AI Trading Copilot – Product Requirements Document (PRD)
-Version: 1.0  
+Version: 1.0  "FROZEN"
 Date: 06 December 2025 (GST)
 
 ## 1. Overview
