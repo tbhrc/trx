@@ -1,0 +1,62 @@
+# Task: Phase 5 & 6 - Performance Optimization and Advanced Sentiment
+
+## Overview
+Implement Phase 5 (Performance Optimization) and Phase 6 (Advanced Sentiment Features) for v1.2.3 to improve NewsEngine scalability and sentiment accuracy.
+
+## Phase 5: Performance Optimization
+- [ ] Implement sentiment score caching
+  - [ ] Add `@lru_cache` decorator
+  - [ ] Configure cache size and expiration
+  - [ ] Add cache clear method
+- [ ] Vectorize keyword matching
+  - [ ] Replace loop-based matching with numpy
+  - [ ] Pre-compile regex patterns
+  - [ ] Batch process headlines
+- [ ] Headline expiration
+  - [ ] Filter headlines >7 days old during load
+  - [ ] Add headline age check
+- [ ] Instrument indexing
+  - [ ] Pre-index headlines by instrument
+  - [ ] Change storage to Dict[str, DataFrame]
+  - [ ] Update query methods for O(1) lookup
+- [ ] Lazy loading
+  - [ ] Only load data when enabled=True
+  - [ ] Add data staleness check
+- [ ] Performance testing
+  - [ ] Create 1000+ headline test dataset
+  - [ ] Benchmark before/after timings
+  - [ ] Target: <100ms sentiment queries
+
+## Phase 6: Advanced Sentiment Features
+- [ ] Source weighting
+  - [ ] Add source column to CSV format
+  - [ ] Implement weighted averaging
+  - [ ] Configure source weights in config.yaml
+- [ ] Sentiment trends
+  - [ ] Create get_sentiment_trend() method
+  - [ ] Return time-series scores
+  - [ ] Detect sentiment shifts
+- [ ] NLP-based sentiment (Optional - Deferred)
+  - [ ] FinBERT integration
+  - [ ] Fallback to keyword matching
+  - [ ] Heavy dependencies (transformers, torch)
+
+## Configuration Updates
+- [ ] Update config.yaml with new parameters
+- [ ] Update NewsConfig dataclass
+- [ ] Document new settings
+
+## Testing
+- [ ] Update test_news.py with performance tests
+- [ ] Add cache correctness tests
+- [ ] Test expiration logic
+- [ ] Regression tests
+
+## Documentation
+- [ ] Update docs/v1.2.3/ with implementation details
+- [ ] Update walkthrough
+- [ ] Performance benchmarks documentation
+
+## Status: IN PROGRESS 🚧
+
+**Strategy**: Full Phase 5 + Partial Phase 6 (skip NLP for now)
