@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Trading Copilot - Dashboard v1.2.4</title>
+  <title>AI Trading Copilot - Dashboard v1.2.5</title>
 
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -23,7 +23,7 @@
   <header class="header">
     <div class="header-title">
       <h1>AI Trading Copilot</h1>
-      <p class="subtitle">Real-time signal monitoring with news sentiment analysis</p>
+      <p class="subtitle">Real-time WebSocket signal monitoring with news sentiment analysis</p>
     </div>
 
     <div class="header-controls">
@@ -39,20 +39,20 @@
       </div>
 
       <!-- Controls -->
-      <button id="refresh-btn" class="btn btn-secondary" title="Manual refresh">
-        🔄 Refresh
+      <button id="refresh-btn" class="btn btn-secondary" title="Reconnect WebSocket">
+        🔄 Reconnect
       </button>
 
-      <button id="pause-btn" class="btn btn-secondary" title="Pause auto-refresh">
+      <button id="pause-btn" class="btn btn-secondary" style="display:none;" title="WebSocket always-on">
         ⏸️ Pause
       </button>
     </div>
   </header>
 
-  <!-- Countdown Timer -->
+  <!-- Status Info -->
   <div style="text-align: center; margin-bottom: 1.5rem;">
     <span id="countdown" style="color: var(--text-muted); font-size: 0.875rem;">
-      Auto-refresh enabled
+      Connecting to WebSocket...
     </span>
   </div>
 
@@ -67,9 +67,9 @@
   <!-- Footer -->
   <footer
     style="margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--bg-tertiary); text-align: center; color: var(--text-muted); font-size: 0.875rem;">
-    <p>AI Trading Copilot v1.2.4 | Enhanced Signal Dashboard</p>
+    <p>AI Trading Copilot v1.2.5 | Real-Time WebSocket Dashboard</p>
     <p style="margin-top: 0.5rem; font-size: 0.75rem;">
-      Auto-refresh: 10s | News Filter: Enabled | Performance Optimized
+      WebSocket: Enabled (5s updates) | News Filter: Enabled | Performance Optimized
     </p>
   </footer>
 
