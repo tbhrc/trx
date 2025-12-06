@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AI Trading Copilot – Dashboard</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #0b1020;
+      color: #f5f5f5;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      margin-bottom: 0.5rem;
+    }
+    .subtitle {
+      color: #9ca3af;
+      margin-bottom: 2rem;
+    }
+    .cards {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .card {
+      background: #111827;
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      min-width: 220px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+    }
+    .card h2 {
+      font-size: 1rem;
+      margin: 0 0 0.5rem 0;
+    }
+    .label {
+      font-size: 0.75rem;
+      color: #9ca3af;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .value {
+      font-size: 0.95rem;
+      margin-bottom: 0.25rem;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      margin-right: 4px;
+    }
+    .badge-long {
+      background: #065f46;
+      color: #ecfdf5;
+    }
+    .badge-short {
+      background: #7f1d1d;
+      color: #fef2f2;
+    }
+    .badge-sideways {
+      background: #374151;
+      color: #e5e7eb;
+    }
+    .timestamp {
+      font-size: 0.75rem;
+      color: #6b7280;
+      margin-top: 0.25rem;
+    }
+    .no-signal {
+      font-size: 0.85rem;
+      color: #6b7280;
+      margin-top: 0.5rem;
+    }
+    .footer {
+      margin-top: 2rem;
+      font-size: 0.75rem;
+      color: #6b7280;
+    }
+  
+    #equityChart {
+      width: 100%;
+      max-width: 900px;
+      height: 240px;
+      background: #020617;
+      border-radius: 8px;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+    }
+</style>
+</head>
+<body>
+  <h1>AI Trading Copilot</h1>
+  <div class="subtitle">Live view of the latest signal per instrument (via /signal/latest).</div>
+
+  <div id="cards" class="cards"></div>
+
+  <div class="footer">
+    Backend: FastAPI • Data: CSV via DataFeed • Strategy: v1.0
+  </div>
+
+  
+  <script>
+    const instruments = ["EURUSD", "GBPUSD", "XAUUSD", "NAS100", "BTCUSD"];
+    const baseUrl = window.location.origin;
+
+    function badgeForDirection(direction) {
+      if (direction === "long") {
+        return '<span class="badge badge-long">LONG</span>';
+      }
+      if (direction === "short") {
+        return '<span class="badge badge-short">SHORT</span>';
+      }
+      return "";
+    }
+
+    function badgeForTrend(trend) {
+      if (!trend) return "";
+      let cls = "badge-sideways";
+      if (trend === "uptrend") cls = "badge-long";
+      if (trend === "downtrend") cls = "badge-short";
+      return '<span class="badge ' + cls + '">' + trend.toUpperCase() + '</span>';
+    }
+
+    async function fetchSignal(symbol) {
+      const url = baseUrl + "/signal/latest?instrument=" + encodeURIComponent(symbol);
+      try {
+        const res = await fetch(url);
+        if (!res.ok) {
+          return { instrument: symbol, error: "HTTP " + res.status };
+        }
+        const data = await res.json();
+        return data || { instrument: symbol, signal: null };
+      } catch (err) {
+        return { instrument: symbol, error: String(err) };
+      }
+    }
+
+    async function refreshSignals() {
+      const container = document.getElementById("cards");
+      container.innerHTML = "";
+      const results = await Promise.all(instruments.map(fetchSignal));
+
+      results.forEach((data, idx) => {
+        const symbol = instruments[idx];
+        const card = document.createElement("div");
+        card.className = "card";
+
+        let inner = "<h2>" + symbol + "</h2>";
+
+        if (!data || data.error) {
+          inner += '<div class="no-signal">Error: ' + (data && data.error ? data.error : "No data") + "</div>";
+        } else if (!data.instrument) {
+          inner += '<div class="no-signal">No signal</div>';
+        } else {
+          inner += '<div class="value">' +
+                   badgeForDirection(data.direction) +
+                   badgeForTrend(data.trend_regime) +
+                   "</div>";
+          inner += '<div class="value"><span class="label">Entry</span> ' + data.entry + "</div>";
+          inner += '<div class="value"><span class="label">Stop</span> ' + data.stop + "</div>";
+          inner += '<div class="value"><span class="label">TP1</span> ' + data.tp1 + "</div>";
+          if (data.tp2) {
+            inner += '<div class="value"><span class="label">TP2</span> ' + data.tp2 + "</div>";
+          }
+          if (data.timestamp) {
+            inner += '<div class="timestamp">Signal time: ' + data.timestamp + "</div>";
+          }
+        }
+
+        card.innerHTML = inner;
+        container.appendChild(card);
+      });
+    }
+
+    async function fetchEquityCurve() {
+      const url = baseUrl + "/equity/portfolio";
+      try {
+        const res = await fetch(url);
+        if (!res.ok) {
+          return [];
+        }
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
+      } catch (err) {
+        return [];
+      }
+    }
+
+    function drawEquityCurve(points) {
+      const canvas = document.getElementById("equityChart");
+      if (!canvas || !canvas.getContext || !points || points.length === 0) return;
+      const ctx = canvas.getContext("2d");
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+
+      if (points.length === 1) {
+        // Draw a single dot to indicate equity when only one data point exists
+        ctx.fillStyle = "#22c55e";
+        ctx.beginPath();
+        ctx.arc(w / 2, h / 2, 3, 0, Math.PI * 2);
+        ctx.fill();
+        return;
+      }
+
+      const equities = points.map(p => p.equity);
+      const minEq = Math.min.apply(null, equities);
+      const maxEq = Math.max.apply(null, equities);
+
+      if (!isFinite(minEq) || !isFinite(maxEq) || maxEq === minEq) {
+        return;
+      }
+
+      const padX = 20;
+      const padY = 20;
+      const innerW = w - padX * 2;
+      const innerH = h - padY * 2;
+
+      ctx.strokeStyle = "#1f2937";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(padX, padY + innerH);
+      ctx.lineTo(padX, padY);
+      ctx.lineTo(padX + innerW, padY);
+      ctx.stroke();
+
+      ctx.beginPath();
+      points.forEach((p, idx) => {
+        const x = padX + (idx / (points.length - 1)) * innerW;
+        const norm = (p.equity - minEq) / (maxEq - minEq);
+        const y = padY + innerH - norm * innerH;
+        if (idx === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      });
+      ctx.strokeStyle = "#22c55e";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+      const padX = 20;
+      const padY = 20;
+      const innerW = w - padX * 2;
+      const innerH = h - padY * 2;
+
+      ctx.strokeStyle = "#1f2937";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(padX, padY + innerH);
+      ctx.lineTo(padX, padY);
+      ctx.lineTo(padX + innerW, padY);
+      ctx.stroke();
+
+      ctx.beginPath();
+      points.forEach((p, idx) => {
+        const x = padX + (idx / (points.length - 1)) * innerW;
+        const norm = (p.equity - minEq) / (maxEq - minEq);
+        const y = padY + innerH - norm * innerH;
+        if (idx === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      });
+      ctx.strokeStyle = "#22c55e";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    async function refreshEquity() {
+      const points = await fetchEquityCurve();
+      drawEquityCurve(points);
+    }
+
+    function bootstrap() {
+      refreshSignals();
+      refreshEquity();
+      setInterval(refreshSignals, 30000);
+      setInterval(refreshEquity, 60000);
+    }
+
+    bootstrap();
+  </script>
+
+</body>
+</html>

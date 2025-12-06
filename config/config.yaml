@@ -1,0 +1,19 @@
+# AI Trading Copilot configuration (v1.0)
+
+# Instruments to track and trade
+instruments:
+  - EURUSD
+  - GBPUSD
+  - XAUUSD
+  - NAS100
+  - BTCUSD
+
+# Data path pattern for CSV-based feeds
+data:
+  path_pattern: "data/{symbol}_{timeframe}.csv"
+
+# Strategy parameters (can be tuned per version)
+strategy:
+  risk_percent_default: 0.75
+  min_rr: 2.0
+  atr_stop_multiplier: 1.25
