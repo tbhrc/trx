@@ -1,0 +1,207 @@
+# News & Economic Calendar Filter Implementation
+
+This plan implements the **News and Macro Filter** feature specified in the v1.0 blueprint (Section 5), which is currently stubbed out in [news.py](file:///c:/Users/user/OneDrive/Documents/App-Web%20Dev/trx/src/v1_0/core/news.py). This is a critical risk management feature that blocks trades around high-impact economic events and integrates sentiment analysis.
+
+## User Review Required
+
+> [!IMPORTANT]
+> **Data Source Decision Required**
+> 
+> This implementation requires an economic calendar data source. Options:
+> 
+> 1. **CSV-based (Recommended for v1.0)**: Simple CSV file with columns: `timestamp`, `currency`, `impact`, `event_name`. You would manually maintain or download this file.
+> 2. **API-based**: Integrate with services like ForexFactory, Investing.com, or Trading Economics (requires API key and internet connection).
+> 
+> The plan below uses **Option 1 (CSV)** for consistency with the existing offline-first architecture. If you prefer API integration, please specify which service.
+
+> [!WARNING]
+> **Breaking Change to StrategyEngine**
+> 
+> The `StrategyEngine.generate_signals()` method will be modified to accept an optional [NewsEngine](file:///c:/Users/user/OneDrive/Documents/App-Web%20Dev/trx/src/v1_0/core/news.py#1-4) parameter. Existing code that directly instantiates [StrategyEngine](file:///c:/Users/user/OneDrive/Documents/App-Web%20Dev/trx/src/v1_0/core/strategy.py#40-132) will continue to work (news filter is optional), but the API server and backtest scripts will be updated to use the news filter.
+
+## Proposed Changes
+
+### Core News Filter Module
+
+#### [MODIFY] [news.py](file:///c:/Users/user/OneDrive/Documents/App-Web%20Dev/trx/src/v1_0/core/news.py)
+
+Implement the [NewsEngine](file:///c:/Users/user/OneDrive/Documents/App-Web%20Dev/trx/src/v1_0/core/news.py#1-4) class with:
+
+- **Economic Calendar Loading**: Read events from CSV file with columns: `timestamp`, `currency`, `impact` (low/medium/high), `event_name`
+- **Event Blocking Logic**: Check if current time is within blocking window (45 min before to 30 min after high-impact events)
+- **Sentiment Analysis**: Simple keyword-based sentiment scoring for news headlines (returns score between -1.0 and +1.0)
+- **Instrument Filtering**: Map currencies to instruments (e.g., "USD" affects EURUSD, GBPUSD, XAUUSD, etc.)
+
+**Key Methods**:
+- `is_blocked(instrument: str, timestamp: pd.Timestamp) -> bool`: Check if trading is blocked
+- `get_sentiment_score(instrument: str, timestamp: pd.Timestamp) -> float`: Get sentiment score
+- `should_reduce_risk(instrument: str, direction: str, timestamp: pd.Timestamp) -> bool`: Check if sentiment opposes trade direction
+
+---
+
+### Configuration Updates
+
+#### [MODIFY] [config.yaml](file:///c:/Users/user/OneDrive/Documents/App-Web%20Dev/trx/config/config.yaml)
+
+Add news filter configuration section:
+
+```yaml
+news:
+  enabled: true
+  calendar_path: "data/economic_calendar.csv"
+  block_before_minutes: 45
+  block_after_minutes: 30
+  high_impact_only: true
+  sentiment_threshold: -0.5  # Skip trade if sentiment opposes direction below this
+```
+
+#### [MODIFY] [config.py](file:///c:/Users/user/OneDrive/Documents/App-Web%20Dev/trx/src/v1_0/core/config.py)
+
+Add `NewsConfig` dataclass and integrate into main [Config](file:///c:/Users/user/OneDrive/Documents/App-Web%20Dev/trx/src/v1_0/core/strategy.py#33-38) class.
+
+---
+
+### Strategy Engine Integration
+
+#### [MODIFY] [strategy.py](file:///c:/Users/user/OneDrive/Documents/App-Web%20Dev/trx/src/v1_0/core/strategy.py)
+
+Update [StrategyEngine](file:///c:/Users/user/OneDrive/Documents/App-Web%20Dev/trx/src/v1_0/core/strategy.py#40-132) to accept optional [NewsEngine](file:///c:/Users/user/OneDrive/Documents/App-Web%20Dev/trx/src/v1_0/core/news.py#1-4):
+
+- Add `news_engine: Optional[NewsEngine]` parameter to [__init__](file:///c:/Users/user/OneDrive/Documents/App-Web%20Dev/trx/src/v1_0/core/strategy.py#52-56)
+- In [generate_signals()](file:///c:/Users/user/OneDrive/Documents/App-Web%20Dev/trx/src/v1_0/core/strategy.py#71-132), after generating candidate signals:
+  1. Check `news_engine.is_blocked()` - skip signal if blocked
+  2. Check `news_engine.should_reduce_risk()` - skip or reduce risk if sentiment opposes
+- Add `news_blocked: bool` and `sentiment_score: float` fields to [Signal](file:///c:/Users/user/OneDrive/Documents/App-Web%20Dev/trx/src/v1_0/core/strategy.py#20-31) dataclass for transparency
+
+---
+
+### API Server Integration
+
+#### [MODIFY] [server.py](file:///c:/Users/user/OneDrive/Documents/App-Web%20Dev/trx/src/v1_0/api/server.py)
+
+- Import and instantiate [NewsEngine](file:///c:/Users/user/OneDrive/Documents/App-Web%20Dev/trx/src/v1_0/core/news.py#1-4) as global singleton (similar to `STRATEGY_ENGINE`)
+- Pass `news_engine` to `STRATEGY_ENGINE.generate_signals()` calls
+- Update `SignalResponse` schema to include `news_blocked` and `sentiment_score` fields
+
+#### [MODIFY] [schemas.py](file:///c:/Users/user/OneDrive/Documents/App-Web%20Dev/trx/src/v1_0/api/schemas.py)
+
+Add optional fields to `SignalResponse`:
+- `news_blocked: Optional[bool]`
+- `sentiment_score: Optional[float]`
+
+---
+
+### Data Files
+
+#### [NEW] [economic_calendar.csv](file:///c:/Users/user/OneDrive/Documents/App-Web%20Dev/trx/data/economic_calendar.csv)
+
+Create sample economic calendar CSV with realistic events for testing:
+
+```csv
+timestamp,currency,impact,event_name
+2024-01-15 13:30:00,USD,high,Non-Farm Payrolls
+2024-01-15 14:00:00,EUR,medium,ECB Press Conference
+...
+```
+
+Include events spanning the date range of existing test data.
+
+#### [NEW] [news_headlines.csv](file:///c:/Users/user/OneDrive/Documents/App-Web%20Dev/trx/data/news_headlines.csv)
+
+Create sample news headlines CSV for sentiment testing:
+
+```csv
+timestamp,instrument,headline
+2024-01-15 10:00:00,EURUSD,ECB signals dovish stance on rates
+2024-01-16 08:00:00,XAUUSD,Gold rallies on safe-haven demand
+...
+```
+
+---
+
+### Testing & Verification Scripts
+
+#### [MODIFY] [smoke_test.py](file:///c:/Users/user/OneDrive/Documents/App-Web%20Dev/trx/smoke_test.py)
+
+- Instantiate [NewsEngine](file:///c:/Users/user/OneDrive/Documents/App-Web%20Dev/trx/src/v1_0/core/news.py#1-4) with config
+- Pass to [StrategyEngine](file:///c:/Users/user/OneDrive/Documents/App-Web%20Dev/trx/src/v1_0/core/strategy.py#40-132)
+- Print news filter status in output (e.g., "News filter: ENABLED" or "News filter: DISABLED")
+
+#### [MODIFY] [backtest_example.py](file:///c:/Users/user/OneDrive/Documents/App-Web%20Dev/trx/backtest_example.py)
+
+- Add [NewsEngine](file:///c:/Users/user/OneDrive/Documents/App-Web%20Dev/trx/src/v1_0/core/news.py#1-4) integration
+- Track and report how many signals were blocked by news filter
+- Print summary: "Signals blocked by news: X / Y total candidates"
+
+---
+
+## Verification Plan
+
+### Automated Tests
+
+#### 1. Smoke Test with News Filter
+**Command**: `python smoke_test.py`
+
+**Expected Behavior**:
+- Script runs without errors
+- Output shows "News filter: ENABLED" or "DISABLED" based on config
+- If enabled and calendar has blocking events, signals may be filtered
+- No import errors or crashes
+
+#### 2. Backtest with News Filter
+**Command**: `python backtest_example.py`
+
+**Expected Behavior**:
+- Backtest completes successfully
+- Summary includes "Signals blocked by news: X" count
+- Results should show fewer trades compared to baseline (if blocking events exist in calendar)
+- No errors or exceptions
+
+#### 3. API Server Integration
+**Command**: `uvicorn main:app --reload`
+
+**Test Steps**:
+1. Start server
+2. Request signal: `curl "http://127.0.0.1:8000/signal/latest?instrument=EURUSD"`
+3. Verify response includes `news_blocked` and `sentiment_score` fields
+4. Check `/config` endpoint shows news configuration
+
+**Expected Behavior**:
+- Server starts without errors
+- Signal responses include new fields
+- Config endpoint shows news settings
+
+#### 4. Unit Test for NewsEngine
+**Command**: `python -m pytest src/v1_0/tests/test_news.py -v` (after creating test file)
+
+**New Test File**: Create `src/v1_0/tests/test_news.py` with tests for:
+- Event blocking logic (before/after windows)
+- Sentiment scoring
+- Instrument-currency mapping
+- Edge cases (missing data, invalid timestamps)
+
+---
+
+### Manual Verification
+
+#### 1. Dashboard Visual Check
+1. Start API server: `uvicorn main:app --reload`
+2. Open browser to `http://127.0.0.1:8000/dashboard`
+3. Verify signals display correctly (no breaking changes)
+4. Check browser console for JavaScript errors
+
+**Expected**: Dashboard loads and displays signals as before
+
+#### 2. News Filter Behavior Test
+1. Edit `data/economic_calendar.csv` to add a high-impact event at current time
+2. Run `python smoke_test.py`
+3. Verify output shows signal was blocked or filtered
+
+**Expected**: News filter actively blocks signals during event windows
+
+#### 3. Configuration Toggle Test
+1. Set `news.enabled: false` in `config.yaml`
+2. Run `python smoke_test.py`
+3. Verify news filter is disabled and signals generate normally
+
+**Expected**: Feature can be cleanly disabled via config
