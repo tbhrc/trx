@@ -1,15 +1,25 @@
-"""News and economic calendar filtering for AI Trading Copilot v1.0.
+"""News and economic calendar filtering for AI Trading Copilot v1.2.3.
 
 This module provides event-based trade blocking and sentiment analysis
 to avoid trading during high-impact economic releases.
+
+Version 1.2.3 optimizations:
+- LRU caching for sentiment scores
+- Vectorized keyword matching with numpy
+- Instrument-indexed headlines for O(1) lookup
+- Headline expiration (>7 days)
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict
+from functools import lru_cache
+from datetime import datetime, timedelta
 import pandas as pd
+import numpy as np
+import re
 
 
 @dataclass
@@ -22,10 +32,11 @@ class NewsConfig:
     block_after_minutes: int = 30
     high_impact_only: bool = True
     sentiment_threshold: float = -0.5
+    headline_expiration_days: int = 7  # Phase 5: Configurable expiration
 
 
 class NewsEngine:
-    """Economic calendar and sentiment filters."""
+    """Economic calendar and sentiment filters with performance optimizations."""
     
     def __init__(self, config: NewsConfig):
         """Initialize NewsEngine with configuration.
@@ -36,6 +47,7 @@ class NewsEngine:
         self.config = config
         self.calendar: Optional[pd.DataFrame] = None
         self.headlines: Optional[pd.DataFrame] = None
+        self.headlines_by_instrument: Dict[str, pd.DataFrame] = {}  # Phase 5: Indexed headlines
         
         # Currency to instrument mapping
         self.currency_map = {
@@ -47,7 +59,7 @@ class NewsEngine:
             "NAS": ["NAS100"],
         }
         
-        # Sentiment keywords (simplified keyword-based scoring)
+        # Sentiment keywords (vectorized in Phase 5)
         self.positive_keywords = [
             "rally", "surge", "gains", "bullish", "optimistic", "growth",
             "strong", "rise", "upbeat", "positive", "boost"
@@ -57,11 +69,17 @@ class NewsEngine:
             "downturn", "slump", "crash", "negative", "concern", "risk"
         ]
         
+        # Phase 5: Pre-compile regex patterns for vectorization
+        self._positive_pattern = re.compile('|'.join(self.positive_keywords), re.IGNORECASE)
+        self._negative_pattern = re.compile('|'.join(self.negative_keywords), re.IGNORECASE)
+        
+        # Phase 5: Lazy loading - only load if enabled
         if self.config.enabled:
             self._load_data()
     
     def _load_data(self):
-        """Load economic calendar and news headlines from CSV files."""
+        """Load economic calendar and news headlines from CSV files with optimizations."""
+        # Load calendar
         cal_path = Path(self.config.calendar_path)
         if cal_path.exists():
             self.calendar = pd.read_csv(cal_path, parse_dates=["timestamp"])
@@ -70,9 +88,29 @@ class NewsEngine:
                     self.calendar["impact"].str.lower() == "high"
                 ].copy()
         
+        # Load headlines with Phase 5 optimizations
         headlines_path = Path(self.config.headlines_path)
         if headlines_path.exists():
             self.headlines = pd.read_csv(headlines_path, parse_dates=["timestamp"])
+            
+            # Phase 5: Filter out headlines older than configured days
+            expiration_days = getattr(self.config, 'headline_expiration_days', 7)
+            if expiration_days > 0:  # 0 = no expiration
+                cutoff_date = datetime.now() - timedelta(days=expiration_days)
+                self.headlines = self.headlines[
+                    self.headlines["timestamp"] >= cutoff_date
+                ].copy()
+            
+            # Phase 5: Pre-index headlines by instrument for O(1) lookup
+            if not self.headlines.empty:
+                for instrument in self.headlines["instrument"].unique():
+                    self.headlines_by_instrument[instrument] = self.headlines[
+                        self.headlines["instrument"] == instrument
+                    ].copy()
+    
+    def clear_cache(self):
+        """Clear the sentiment score cache. Useful after data refresh."""
+        self._get_sentiment_score_cached.cache_clear()
     
     def is_blocked(self, instrument: str, timestamp: pd.Timestamp) -> bool:
         """Check if trading is blocked for instrument at given time.
@@ -111,9 +149,9 @@ class NewsEngine:
         return False
     
     def get_sentiment_score(self, instrument: str, timestamp: pd.Timestamp) -> float:
-        """Get sentiment score for instrument at given time.
+        """Get sentiment score with LRU caching (Phase 5).
         
-        Uses simple keyword matching on headlines within the last 24 hours.
+        Delegates to cached implementation for performance.
         
         Args:
             instrument: Trading instrument
@@ -122,36 +160,92 @@ class NewsEngine:
         Returns:
             Sentiment score between -1.0 (bearish) and +1.0 (bullish)
         """
-        if not self.config.enabled or self.headlines is None or self.headlines.empty:
+        # Round timestamp to nearest hour for cache key
+        timestamp_hour = timestamp.floor('h')
+        return self._get_sentiment_score_cached(instrument, timestamp_hour, timestamp)
+    
+    @lru_cache(maxsize=1000)
+    def _get_sentiment_score_cached(self, instrument: str, timestamp_hour: pd.Timestamp, timestamp: pd.Timestamp) -> float:
+        """Cached sentiment score calculation with vectorized keyword matching (Phase 5).
+        
+        Args:
+            instrument: Trading instrument
+            timestamp_hour: Timestamp rounded to hour (cache key)
+            timestamp: Actual timestamp for lookback
+            
+        Returns:
+            Sentiment score between -1.0 (bearish) and +1.0 (bullish)
+        """
+        if not self.config.enabled or not self.headlines_by_instrument:
             return 0.0
         
-        # Get headlines for this instrument from last 24 hours
+        # Phase 5: Use pre-indexed headlines for O(1) lookup
+        if instrument not in self.headlines_by_instrument:
+            return 0.0
+        
+        instrument_headlines = self.headlines_by_instrument[instrument]
+        
+        # Get headlines from last 24 hours
         lookback = pd.Timedelta(hours=24)
-        recent = self.headlines[
-            (self.headlines["instrument"] == instrument) &
-            (self.headlines["timestamp"] <= timestamp) &
-            (self.headlines["timestamp"] >= timestamp - lookback)
+        recent = instrument_headlines[
+            (instrument_headlines["timestamp"] <= timestamp) &
+            (instrument_headlines["timestamp"] >= timestamp - lookback)
         ]
         
         if recent.empty:
             return 0.0
         
-        # Score based on keyword counts
-        total_score = 0.0
-        for _, row in recent.iterrows():
-            headline = str(row.get("headline", "")).lower()
-            
-            pos_count = sum(1 for kw in self.positive_keywords if kw in headline)
-            neg_count = sum(1 for kw in self.negative_keywords if kw in headline)
-            
-            if pos_count + neg_count > 0:
-                total_score += (pos_count - neg_count) / (pos_count + neg_count)
+        # Phase 5: Vectorized keyword matching with regex
+        headlines_text = recent["headline"].str.lower().fillna('')
+        
+        # Count keyword occurrences using vectorized operations
+        pos_counts = headlines_text.str.count(self._positive_pattern).values
+        neg_counts = headlines_text.str.count(self._negative_pattern).values
+        
+        # Calculate scores
+        total_keywords = pos_counts + neg_counts
+        
+        # Avoid division by zero
+        scores = np.where(
+            total_keywords > 0,
+            (pos_counts - neg_counts) / total_keywords,
+            0.0
+        )
         
         # Average and normalize
-        if len(recent) > 0:
-            return max(-1.0, min(1.0, total_score / len(recent)))
+        if len(scores) > 0:
+            avg_score = np.mean(scores)
+            return float(np.clip(avg_score, -1.0, 1.0))
         
         return 0.0
+    
+    def get_sentiment_trend(self, instrument: str, timestamp: pd.Timestamp, hours_back: int = 24) -> pd.Series:
+        """Get sentiment score time series for trend analysis (Phase 6).
+        
+        Args:
+            instrument: Trading instrument
+            timestamp: Current timestamp
+            hours_back: Number of hours to look back
+            
+        Returns:
+            pandas Series with hourly sentiment scores indexed by timestamp
+        """
+        if not self.config.enabled or instrument not in self.headlines_by_instrument:
+            return pd.Series(dtype=float)
+        
+        # Get hourly timestamps
+        timestamps = pd.date_range(
+            end=timestamp,
+            periods=hours_back,
+            freq='H'
+        )
+        
+        # Calculate sentiment for each hour
+        scores = {}
+        for ts in timestamps:
+            scores[ts] = self.get_sentiment_score(instrument, ts)
+        
+        return pd.Series(scores)
     
     def should_reduce_risk(
         self,

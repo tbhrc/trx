@@ -178,7 +178,8 @@ class TestSentimentScoring:
         config = NewsConfig(
             enabled=True,
             calendar_path="nonexistent.csv",
-            headlines_path=str(headlines_file)
+            headlines_path=str(headlines_file),
+            headline_expiration_days=0  # Disable expiration for tests
         )
         return NewsEngine(config)
     
@@ -233,7 +234,8 @@ class TestRiskReduction:
             enabled=True,
             calendar_path="nonexistent.csv",
             headlines_path=str(headlines_file),
-            sentiment_threshold=-0.5
+            sentiment_threshold=-0.5,
+            headline_expiration_days=0  # Disable expiration for tests
         )
         return NewsEngine(config)
     
